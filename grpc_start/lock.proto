@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package lock_service;
+
+// Lock acquire/release arguments
+message lock_args {
+    int32 client_id = 1;    
+}
+
+// Server return Status
+enum Status {
+    SUCCESS = 0;   
+    FILE_ERROR = 1;
+    NOT_PRIMARY = 2;    // When request is sent to replica
+    SYNC_ERROR = 3;     // Synchronization issues
+    LOCK_ACQUIRE_ERROR = 4;
+    LOCK_RELEASE_ERROR = 5;
+}
+
+// Response struct
+message Response {
+    Status status = 1;
+    string message = 2;
+}
+
+// File append arguments
+message file_args {
+    string filename = 1;
+    bytes content = 2;
+    int32 client_id = 3;
+    string request_id = 4;  // Unique request ID
+}
+
+// Field to hold an int
+message Int {
+    int32 rc = 1;
+}
+
+// Heartbeat messages
+message HeartbeatRequest {
+    int32 server_id = 1;    // Unique identifier of the sending server
+    bool is_primary = 2;     // Whether the sender is primary
+    int64 timestamp = 3;     // Current timestamp
+}
+
+message HeartbeatResponse {
+    bool acknowledged = 1;   // Whether heartbeat was received
+    int32 server_id = 2;    // ID of the responding server
+}
+
+// State synchronization message
+message StateSync {
+    bytes state = 1;         // Serialized state data
+    int64 timestamp = 2;     // Timestamp of the state
+    int32 primary_id = 3;   // ID of the primary server
+}
+
+// Election messages
+message ElectionRequest {
+    int32 server_id = 1;
+}
+
+message ElectionResponse {
+    bool ok = 1;
+}
+
+message CoordinatorNotification {
+    int32 server_id = 1;
+}
+
+// Lock service definition
+service LockService {
+    // Client RPCs
+    rpc client_init(Int) returns (Response);
+    rpc lock_acquire(lock_args) returns (Response);
+    rpc lock_release(lock_args) returns (Response);
+    rpc file_append(file_args) returns (Response);
+    rpc client_close(Int) returns (Response);
+    
+    // Heartbeat and synchronization RPCs
+    rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+    rpc SyncState(StateSync) returns (Response);
+
+    // Election RPCs
+    rpc Election(ElectionRequest) returns (ElectionResponse);
+    rpc Coordinator(CoordinatorNotification) returns (google.protobuf.Empty);
+}
